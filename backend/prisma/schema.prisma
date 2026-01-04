@@ -1,0 +1,144 @@
+// Prisma schema for Somtum POS System
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// หมวดหมู่เมนู
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String
+  icon      String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  menuItems MenuItem[]
+}
+
+// รายการเมนู
+model MenuItem {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  price       Float
+  image       String?
+  categoryId  Int
+  isAvailable Boolean  @default(true)
+  isPopular   Boolean  @default(false)
+  spicyLevel  Int      @default(0) // 0-5 ระดับความเผ็ด
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  category    Category @relation(fields: [categoryId], references: [id])
+  orderItems  OrderItem[]
+  addons      MenuItemAddon[]
+}
+
+// ส่วนเพิ่มเติม (Add-ons)
+model Addon {
+  id        Int      @id @default(autoincrement())
+  name      String
+  price     Float
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  menuItems MenuItemAddon[]
+  orderItemAddons OrderItemAddon[]
+}
+
+// ความสัมพันธ์ระหว่างเมนูกับ Add-on
+model MenuItemAddon {
+  id         Int      @id @default(autoincrement())
+  menuItemId Int
+  addonId    Int
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  addon      Addon    @relation(fields: [addonId], references: [id])
+
+  @@unique([menuItemId, addonId])
+}
+
+// คำสั่งซื้อ
+model Order {
+  id            Int         @id @default(autoincrement())
+  orderNumber   String      @unique
+  tableNumber   String?
+  customerName  String?
+  status        String      @default("pending") // pending, preparing, ready, completed, cancelled
+  subtotal      Float
+  discount      Float       @default(0)
+  tax           Float       @default(0)
+  total         Float
+  paymentMethod String?     // cash, promptpay, credit_card
+  paymentStatus String      @default("unpaid") // unpaid, paid, refunded
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  completedAt   DateTime?
+  orderItems    OrderItem[]
+  payment       Payment?
+}
+
+// รายการในคำสั่งซื้อ
+model OrderItem {
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  menuItemId Int
+  quantity   Int
+  unitPrice  Float
+  totalPrice Float
+  spicyLevel Int      @default(0)
+  notes      String?
+  createdAt  DateTime @default(now())
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  addons     OrderItemAddon[]
+}
+
+// Add-on ในรายการคำสั่งซื้อ
+model OrderItemAddon {
+  id          Int       @id @default(autoincrement())
+  orderItemId Int
+  addonId     Int
+  price       Float
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  addon       Addon     @relation(fields: [addonId], references: [id])
+}
+
+// การชำระเงิน
+model Payment {
+  id            Int      @id @default(autoincrement())
+  orderId       Int      @unique
+  amount        Float
+  method        String   // cash, promptpay, credit_card
+  receivedAmount Float?  // สำหรับเงินสด
+  changeAmount  Float?   // เงินทอน
+  transactionId String?  // สำหรับ PromptPay/บัตรเครดิต
+  status        String   @default("completed") // pending, completed, failed, refunded
+  createdAt     DateTime @default(now())
+  order         Order    @relation(fields: [orderId], references: [id])
+}
+
+// การตั้งค่าระบบ
+model Setting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// สถิติรายวัน
+model DailyStat {
+  id           Int      @id @default(autoincrement())
+  date         DateTime @unique
+  totalOrders  Int      @default(0)
+  totalRevenue Float    @default(0)
+  totalItems   Int      @default(0)
+  avgOrderValue Float   @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
